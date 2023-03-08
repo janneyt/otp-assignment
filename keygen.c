@@ -14,11 +14,12 @@ int main(int argc, char *argv[]){
 
     for(int index = 0; index < atoi(*(argv+1)); index++){
 
-      printf("%c", allowed_characters[rand() / (RAND_MAX / 27 +1)]);
+      	printf("%c", allowed_characters[rand() / (RAND_MAX / 27 +1)]);
     };
+    printf("\n");
     
   } else {
     printf("Too few arguments");
     exit(EXIT_FAILURE);
   };
-};
+}
