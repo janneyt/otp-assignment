@@ -1,10 +1,12 @@
-# include <stdio.h>
 # include <stdlib.h>
 # include <unistd.h>
 # include <string.h>
 # include <sys/types.h>
 # include <sys/socket.h>
 # include <netdb.h>
+# ifndef  MAX_MSG_LEN
+# include "constants.h"
+# endif
 
 // Error function for reporting issues
 void error(const char *msg) {
@@ -37,23 +39,24 @@ void setupAddressStruct(struct sockaddr_in* address, int portNumber, char* hostn
 int main(int argc, char *argv[]){
   	int socketFD, portNumber, charsWritten, charsRead;
   	struct sockaddr_in serverAddress;
-  	char buffer[256];
+  	char buffer[MAX_MSG_LEN + 1] = "";
 	//  int key_int;
   	FILE* key_file;
-  	char key[2048];
+  	char key[MAX_MSG_LEN + 1] = "";
   
 	// Check usage & args
   	if(argc < 4){
-    		error("USAGE: %s plaintext key port\n", argv[0]);
+    		fprintf(stderr, "USAGE: %s plaintext key port\n", argv[0]);
+		exit(EXIT_FAILURE);
   	}
 
 	// Check for a weird error where argv[3] has been reset to 0x0
 	if(argv[3] == 0x0){
 		error("Port number is 0x0");
   	}
-	
+	strcpy(key, argv[2]);
   	portNumber = atoi(argv[3]);
-	if(portNumber < 0){
+	if(portNumber < 1000 || portNumber > 65545){
 		error("Invalid port number");
 	}
   
@@ -63,7 +66,22 @@ int main(int argc, char *argv[]){
     		error("CLIENT: ERROR opening socket");
   	}
 
-  
+	// Acquire key from keyfile
+  	key_file = fopen(key, "r+");
+  	if(key_file == NULL){
+    		error("Could not open key file");
+  	};
+	strcpy(key, "");
+	int counter = 0;
+	while(fgets(key, MAX_MSG_LEN, key_file) != NULL){
+		counter++;
+	}
+	printf("Length of key: %ld\n", strlen(key));
+  	if(fclose(key_file) == EOF){
+		fprintf(stdout, "Something must be wrong because closing the file failed");
+		exit(EXIT_FAILURE);
+	};
+	fprintf(stdout, "Key file successfully read into client\n");  
   	// Set up the server address struct 
   	setupAddressStruct(&serverAddress, portNumber, "localhost");
   
@@ -71,51 +89,66 @@ int main(int argc, char *argv[]){
   	if (connect(socketFD, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) < 0){
     		error("CLIENT: ERROR connection");
   	}
+	fprintf(stdout, "Connecting to server\n");
 
   	// Wait for verification code from server
-  	charsWritten = recv(socketFD, buffer, 39, 0);
+  	charsWritten = recv(socketFD, buffer, MAX_MSG_LEN, 0);
   	if(charsWritten < 0){
     		error("Could not receive verification from server");
   	}
-
+	fprintf(stdout, "Verifying...");
   	if(strcmp(buffer, "Who are you? I am enc-server.") != 0){
     		error("Wrong server.");
   	};
-
-  	charsWritten = send(socketFD, "I am enc-client.", 39, 0);
+	fprintf(stdout, "\b");
+	fflush(stdout);
+	sleep(1);
+  	charsWritten = send(socketFD, "I am enc-client.", MAX_MSG_LEN, 0);
   	if(charsWritten < 0){
     		error("Could not send verification back to server.");
   	};
-
-  	charsWritten = recv(socketFD, buffer, 100, 0);
+	fprintf(stdout, ".");
+	fflush(stdout);
+	sleep(1);
+  	charsWritten = recv(socketFD, buffer, MAX_MSG_LEN, 0);
   	if(charsWritten < 0){
     		error("Server disconnected");
   	};
+	fprintf(stdout, "\b");
+	fflush(stdout);
 
-  	// Acquire key from keyfile
-  	key_file = fopen(key, "r");
-  	if(key_file == NULL || fgets(key, strlen(key), key_file) == NULL){
-    		error("Could not open key file");
-  	};
-  	fclose(key_file);
-  	charsWritten = send(socketFD, key, strlen(key), 0);
-
+	charsWritten = send(socketFD, key, MAX_MSG_LEN, 0);
+	fprintf(stdout, ".");
+	fflush(stdout);
+	sleep(1);
   	if(charsWritten < 0){
-    		error("Could not sendkey back to server.");
+    		error("Could not send key back to server.");
   	};
-
-  	charsWritten = recv(socketFD, buffer, 255, 0);
+	fprintf(stdout, "\b");
+  	charsWritten = recv(socketFD, buffer, MAX_MSG_LEN, 0);
   	if(charsWritten < 0){
     		error("Could not get confirmation.");
   	};
-
+	fprintf(stdout, ".\n");
+	fflush(stdout);
+	sleep(1);
+	if(strcmp(buffer, "Key is too short.") == 0){
+		fprintf(stderr, "The key is too short. Closing client. Please try again.");
+		fflush(stderr);
+		exit(EXIT_FAILURE);
+	}
   	if(strcmp(buffer, "Key suffices.") != 0){
-    		printf("Something went wrong. Please try again.\n");
+		close(socketFD);
+		fprintf(stderr, "Something went wrong. Please try again.\n%s\n", buffer);
+		exit(EXIT_FAILURE);
     
   	};
+	fprintf(stdout, "Key approved, preparing encryption\n");
+	fflush(stdout);
+	fflush(stderr);
 
   	// Get input message from user
-  	printf("Client: enter text to send to the server, and then hit enter: ");
+  	printf("\nClient: enter text to send to the server, and then hit enter: ");
   	// Clear out the buffer array 
   	memset(buffer, '\0', sizeof(buffer));
   	// Get input from the user, trunc to buffer - 1 chars, levaing \0
@@ -125,10 +158,12 @@ int main(int argc, char *argv[]){
 
   	// Remove the trailing \n that fgets adds 
   	buffer[strcspn(buffer, "\n")] = '\0';
-  	
+  	if(strlen(buffer) > strlen(key)){
+		error("Key must be equal to or greater than the length of the text to be encrypted");
+	}
 	// send message to server 
   	// Write to the server 
-  	charsWritten = send(socketFD, buffer, strlen(buffer), 0);
+  	charsWritten = send(socketFD, buffer, MAX_MSG_LEN, 0);
   	if(charsWritten < 0){
     		printf("CLIENT: WARNING: Not all data written to socket!\n");
   	};
@@ -138,7 +173,7 @@ int main(int argc, char *argv[]){
   	memset(buffer, '\0', sizeof(buffer));
 
   	// Read data from the socke, leaving \0 at end
-  	charsRead = recv(socketFD, buffer, sizeof(buffer) -1, 0);
+  	charsRead = recv(socketFD, buffer, MAX_MSG_LEN, 0);
   	if(charsRead < 0){
     		error("CLIENT: ERROR reading from socket");
   	}
@@ -146,6 +181,8 @@ int main(int argc, char *argv[]){
   
   	// Close the socket
   	close(socketFD);
-  
-  	return EXIT_SUCCESS;
+	fprintf(stdout, "Closing as all tasks are complete");
+  	fflush(stdout);
+	fflush(stderr);
+  	exit(EXIT_SUCCESS);
 }
