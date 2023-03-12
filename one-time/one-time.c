@@ -4,12 +4,15 @@
 # include <assert.h>
 # include <unistd.h>
 
-#define MAX_MSG_LEN 1024
+# ifndef  key_size
+# include "../constants.h"
+# endif
 
-int encrypt_one_time_pad(char message[MAX_MSG_LEN + 1], char key[MAX_MSG_LEN + 1], char result[MAX_MSG_LEN + 1])
+int encrypt_one_time_pad(char* message, char* key, char* result)
 {
     char cipher[MAX_MSG_LEN + 1] = { 0 }; 
-
+    printf("Inside encryption routine: %s\n", message);
+    fflush(stdout);
     /* Remove newline character from the end of the message */
     if (message[strlen(message) - 1] == '\n') {
         message[strlen(message) - 1] = '\0';
@@ -76,22 +79,3 @@ int decrypt_one_time_pad(char message[MAX_MSG_LEN + 1], char key[MAX_MSG_LEN + 1
     return EXIT_SUCCESS;
 }
 
-int main(void)
-{
-    /* Test 1: Encrypt a short message with a short key */
-    char msg1[MAX_MSG_LEN + 1] = "HELLO";
-    char msg2[MAX_MSG_LEN + 1] = "JELLO";
-    char key1[MAX_MSG_LEN + 1] = "XMCKL";
-    char result1[MAX_MSG_LEN + 1] = "";
-    char result2[MAX_MSG_LEN + 1] = "";
-    char* expected1 = "EQNVZ";
-    assert(encrypt_one_time_pad(msg1, key1, result1) == EXIT_SUCCESS);
-    printf("Expected: %s\n", expected1);
-    decrypt_one_time_pad(result1, key1, result2);
-    printf("Result: %s\nExpected: %s\n", result2, msg1);
-    encrypt_one_time_pad(msg2, key1, result1);
-    printf("EncrypteD: %s\n", result1);
-    decrypt_one_time_pad(result1, key1, result2);
-    printf("Decrypted: %s\n", result2);
-    return EXIT_SUCCESS;
-}

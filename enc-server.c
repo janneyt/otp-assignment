@@ -6,11 +6,15 @@
 # include 	<sys/socket.h>
 # include 	<netinet/in.h>
 # include 	<wait.h>
+# ifndef	MAX_MSG_LEN
 # include 	"one-time/one-time.h"
 # include 	"constants.h"
+# include	"reading_funcs.h"
+# endif
 # include 	<assert.h>
 # include 	<time.h>
 
+size_t key_size = MAX_MSG_LEN + 1;
 
 // Error function used for reporting issues
 void
@@ -40,12 +44,13 @@ int main (int argc, char *argv[])
 {
 	char message[MAX_MSG_LEN + 1] = "HELLO";
 	char result[MAX_MSG_LEN + 1] = "";
-	char key[MAX_MSG_LEN + 1] = "XMCKL";
+	char temp_key[MAX_MSG_LEN + 1] = "XMCKL";
 	char result2[MAX_MSG_LEN + 1] = "";
-	assert(encrypt_one_time_pad(message, key, result) == EXIT_SUCCESS);
-	assert(decrypt_one_time_pad(result, key, result2) == EXIT_SUCCESS);
+	assert(encrypt_one_time_pad(message, temp_key, result) == EXIT_SUCCESS);
+	assert(decrypt_one_time_pad(result, temp_key, result2) == EXIT_SUCCESS);
 	fprintf(stderr, "Result: %s\nResult2: %s\n", result, result2);
 	assert(strcmp(message, result2) == 0);
+	char* key = {""};
   	int connectionSocket, charsRead;
   	char buffer[256];
   	char veribuffer[256];
@@ -95,16 +100,20 @@ int main (int argc, char *argv[])
 		fflush(stderr);
 		continue;
 	}
-	while(num_threads < NUM_THREADS){
-		fprintf(stderr, "Num threads: %d", num_threads);
+    	// Start listening for connections. Allow up to 5 connections to queue up
+    	while(listen (listenSocket, 5) < 0){
+	    	fprintf(stderr, "Waiting for socket");
 		fflush(stderr);
-    		// Start listening for connections. Allow up to 5 connections to queue up
-    		while(listen (listenSocket, 5) < 0){
-	      		fprintf(stderr, "Waiting for socket");
+	};
+ 
+	while(num_threads < NUM_THREADS){
+		fprintf(stderr, "Num threads: %d\n", num_threads);
+		fflush(stderr);
+    		if(num_threads < 0){
+			fprintf(stderr, "Threads cannot be negative\n");
 			fflush(stderr);
-		};
-		num_threads++;
-    
+			num_threads = 0;
+		}
 		// Accept the connection request which creates a connection socket 
     		connectionSocket = accept (listenSocket, (struct sockaddr *) &clientAddress,&sizeOfClientInfo);
     		if (connectionSocket < 0){
@@ -113,7 +122,7 @@ int main (int argc, char *argv[])
     		} else {
       
       			pid = fork();
-
+			num_threads++;
       			if(pid < 0){
         			close(connectionSocket);
 				error("There was a problem forking");
@@ -165,12 +174,9 @@ int main (int argc, char *argv[])
           				error("Did not request key from client.");
         			}
 
-        			charsRead = recv(connectionSocket, key, strlen(key), 0);
-        			if(charsRead < 0){
-          				close(connectionSocket);
-					error("Did not receive key from client.");
-        			}
-				fprintf(stderr, "Key length: %jd\nBuffer length: %jd\n", strlen(key), strlen(buffer));
+				key = read_key(key, connectionSocket);
+        			
+				fprintf(stderr, "Key: %s\nKey length: %jd\nBuffer length: %jd\n", key, strlen(key), strlen(buffer));
 				fflush(stderr);
 
         			if(strlen(key) < strlen(buffer)){
@@ -187,7 +193,7 @@ int main (int argc, char *argv[])
           				
 				
         			} else {
-		        		charsRead = send(connectionSocket, "Key suffices.", MAX_MSG_LEN, 0);
+		        		charsRead = send(connectionSocket, KEY_SUFFICES, MAX_MSG_LEN, 0);
           				if(charsRead < 0){
             					close(connectionSocket);
 						error("Client disconnected");
@@ -234,7 +240,7 @@ int main (int argc, char *argv[])
                
       				// Process child (but don't hang)
       				do{
-        				wpid = waitpid(-1, &status, WNOHANG);
+        				wpid = waitpid(0, &status, WNOHANG);
       				} while(!WIFEXITED(status) & !WIFSIGNALED(status));
 			
 				if(wpid > 0){
