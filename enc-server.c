@@ -28,7 +28,7 @@ error (const char *msg)
 
 int setupAddressStruct (struct sockaddr_in *address, int portNumber){
 
-  // Clear out hte address struct
+  // Clear out the address struct
   memset ((char *) address, '\0', sizeof (*address));
 
   // The address should be network capable
@@ -50,7 +50,6 @@ int main (int argc, char *argv[])
 	assert(decrypt_one_time_pad(result, temp_key, result2) == EXIT_SUCCESS);
 	fprintf(stderr, "Result: %s\nResult2: %s\n", result, result2);
 	assert(strcmp(message, result2) == 0);
-	char* key = {""};
   	int connectionSocket, charsRead;
   	char buffer[256];
   	char veribuffer[256];
@@ -168,16 +167,34 @@ int main (int argc, char *argv[])
 					error("Could not trust client");
         			}
 
-        			charsRead = send(connectionSocket, "Verification received. Send key.", 39, 0);
+        			charsRead = send(connectionSocket, VERIFICATION_RECEIVED, 39, 0);
         			if(charsRead < 0){
 					close(connectionSocket);
           				error("Did not request key from client.");
         			}
-
-				key = read_key(key, connectionSocket);
-        			
-				fprintf(stderr, "Key: %s\nKey length: %jd\nBuffer length: %jd\n", key, strlen(key), strlen(buffer));
+				fprintf(stderr, "Getting key\n");
 				fflush(stderr);
+				
+				// Get key
+				char* key = calloc(MAX_MSG_LEN, sizeof(char));
+				while(strcmp(read_key(key, connectionSocket), RESTART) == 0){
+					key = calloc(MAX_MSG_LEN, sizeof(char));
+				};
+        			
+				fprintf(stderr, "Key length: %jd\n", strlen(key));
+				fflush(stderr);
+
+				while((charsRead = send(connectionSocket, RECEIVED_LENGTH, MAX_MSG_LEN, 0)) < 1){
+					fprintf(stderr, "Struggling to send RECEIVED_LENGTH");
+				}
+
+				// Get plaintext
+				char* plaintext = calloc(MAX_MSG_LEN, sizeof(char));
+				while(strcmp(read_key(plaintext, connectionSocket), RESTART) == 0){
+					plaintext = calloc(MAX_MSG_LEN, sizeof(char));
+				};
+
+				printf("Plaintext: %s", plaintext);
 
         			if(strlen(key) < strlen(buffer)){
           				printf("Key length: %lu\nBuffer length: %lu", strlen(key), strlen(buffer));
