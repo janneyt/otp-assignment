@@ -48,11 +48,11 @@ int main (int argc, char *argv[])
 	char result2[MAX_MSG_LEN + 1] = "";
 	assert(encrypt_one_time_pad(message, temp_key, result) == EXIT_SUCCESS);
 	assert(decrypt_one_time_pad(result, temp_key, result2) == EXIT_SUCCESS);
-	fprintf(stderr, "Result: %s\nResult2: %s\n", result, result2);
+	//fprintf(stderr, "Result: %s\nResult2: %s\n", result, result2);
 	assert(strcmp(message, result2) == 0);
   	int connectionSocket, charsRead;
-  	char buffer[256];
-  	char veribuffer[256];
+  	char buffer[MAX_MSG_LEN + 1];
+  	buffer[MAX_MSG_LEN + 1] = '\0';
   	struct sockaddr_in clientAddress;
 	int num_threads = 0;
   	socklen_t sizeOfClientInfo = sizeof (clientAddress);
@@ -77,8 +77,8 @@ int main (int argc, char *argv[])
 		fprintf(stderr, "Waiting for threads to be in valid range\n");
 		fflush(stderr);
 	}
-	printf("Opening socket\n");
-	fflush(stdout);
+	//printf("Opening socket\n");
+	//fflush(stdout);
  	// Blank out serverAddress
     	struct sockaddr_in serverAddress;
 
@@ -106,8 +106,8 @@ int main (int argc, char *argv[])
 	};
  
 	while(num_threads < NUM_THREADS){
-		fprintf(stderr, "Num threads: %d\n", num_threads);
-		fflush(stderr);
+		//fprintf(stderr, "Num threads: %d\n", num_threads);
+		//fflush(stderr);
     		if(num_threads < 0){
 			fprintf(stderr, "Threads cannot be negative\n");
 			fflush(stderr);
@@ -135,120 +135,102 @@ int main (int argc, char *argv[])
 				ntohs (clientAddress.sin_port));
 
 	      			// Get the message from the client and display it
-	      			memset (buffer, '\0', 256);
-       				memset(veribuffer, '\0', 256);
+	      			memset (buffer, '\0', MAX_MSG_LEN);
 	      
         			// Verification it's the client
-        			charsRead = send(connectionSocket, "Who are you? I am enc-server.", 39, 0);
+				fprintf(stderr, "Sending SERVERICODE\n");
+				fflush(stderr);
+        			charsRead = send(connectionSocket, SERVERVERICODE, MAX_MSG_LEN, 0);
         			if(charsRead < 0){
+					fprintf(stderr, "Sending verification request failed\n");
+					fflush(stderr);
 					close(connectionSocket);
           				error("Could not send message to client");
         			}
 
         			// Get the client's verification code
-        			charsRead = recv(connectionSocket, veribuffer, 255, 0);
+				fprintf(stderr, "Waiting for CLIENTVERICODE\n");
+				fflush(stderr);
+        			charsRead = recv(connectionSocket, buffer, MAX_MSG_LEN, 0);
         			if(charsRead < 0){
           				
 					fprintf(stderr, "\nERROR reading from socket\nWaiting for client's verification code...\n");
-					while(charsRead < 0){
-						fprintf(stderr, "\b");
-						charsRead = recv(connectionSocket, veribuffer, 255, 0);
-						fprintf(stderr, ".");
-						fflush(stderr);
-						fflush(stdout);
-					}
-					fprintf(stderr, "Found verification code!\n");
 					fflush(stderr);
-        			}
+					close(connectionSocket);
+					exit(EXIT_FAILURE);
+				}
 
-	
-        			if(strcmp(veribuffer, "I am enc-client.") != 0){
-          				close(connectionSocket);
+				fprintf(stderr, "Testing for client's verification: %s\n", buffer);
+				fflush(stderr);
+        			if(strcmp(buffer, CLIENTVERICODE) != 0){
+          				fprintf(stderr, "Verification failed\n");
+					fflush(stderr);
+					close(connectionSocket);
 					error("Could not trust client");
         			}
 
+				fprintf(stderr, "Sending VERIFICATION RECEIVED to client\n");
+				fflush(stderr);
         			charsRead = send(connectionSocket, VERIFICATION_RECEIVED, 39, 0);
         			if(charsRead < 0){
+					fprintf(stderr, "Sending verification received failed\n");
+					fflush(stderr);
 					close(connectionSocket);
           				error("Did not request key from client.");
         			}
-				fprintf(stderr, "Getting key\n");
+				fprintf(stderr, "Verification received and sent. Getting key\n");
 				fflush(stderr);
 				
 				// Get key
 				char* key = calloc(MAX_MSG_LEN, sizeof(char));
 				while(strcmp(read_key(key, connectionSocket), RESTART) == 0){
+					//exit(EXIT_FAILURE);
 					key = calloc(MAX_MSG_LEN, sizeof(char));
 				};
-        			
-				fprintf(stderr, "Key length: %jd\n", strlen(key));
+				fprintf(stderr, "Key after key readin: %s\n", key);
 				fflush(stderr);
-
-				while((charsRead = send(connectionSocket, RECEIVED_LENGTH, MAX_MSG_LEN, 0)) < 1){
-					fprintf(stderr, "Struggling to send RECEIVED_LENGTH");
-				}
 
 				// Get plaintext
 				char* plaintext = calloc(MAX_MSG_LEN, sizeof(char));
 				while(strcmp(read_key(plaintext, connectionSocket), RESTART) == 0){
 					plaintext = calloc(MAX_MSG_LEN, sizeof(char));
-				};
-
-				printf("Plaintext: %s", plaintext);
-
-        			if(strlen(key) < strlen(buffer)){
-          				printf("Key length: %lu\nBuffer length: %lu", strlen(key), strlen(buffer));
-          				charsRead = send(connectionSocket, "Key is too short.", MAX_MSG_LEN, 0);
-          				if(charsRead < 0){
-						close(connectionSocket);
-            					error("Client disconnected");
-          				}
-					fprintf(stderr, "Closing child in server");
-					fflush(stderr);
-					close(connectionSocket);
-					exit(EXIT_FAILURE);
-          				
-				
-        			} else {
-		        		charsRead = send(connectionSocket, KEY_SUFFICES, MAX_MSG_LEN, 0);
-          				if(charsRead < 0){
-            					close(connectionSocket);
-						error("Client disconnected");
-          				}
-
-        				// Get the message from the client and display it
-	      				memset (buffer, '\0', MAX_MSG_LEN);
-        				memset(veribuffer, '\0', MAX_MSG_LEN);
-					strcpy(buffer, "");
-					strcpy(veribuffer, "");
-        				// Read the client's message from the socket 
-	      				charsRead = recv (connectionSocket, buffer, MAX_MSG_LEN, 0);
-	      				if (charsRead < 0){
-						close(connectionSocket);
-		      				error ("ERROR reading from socket");
-        				}
-	      				printf ("SERVER: I received this from the client: \"%s\"\n", buffer);
-					strcpy(message, buffer);
-					strcpy(result, "");
-	      				if(encrypt_one_time_pad(message, key, result) == EXIT_FAILURE){
-						fprintf(stderr, "Could not encrypt the message\n");
-						close(connectionSocket);
-						exit(EXIT_FAILURE);
-					}
-
-        				printf ("SERVER: I have encrypted your message: \"%s\"\n", message);
-
-	      				// Send a Success message back to the client 
-	      				charsRead = send (connectionSocket, message, MAX_MSG_LEN, 0);
-
-	      				if (charsRead < 0){
-						close(connectionSocket);
-		      				perror ("ERROR writing to socket\n");
-					}
-					close(connectionSocket);
-
 				}
-				close(connectionSocket);
+				fprintf(stderr, "Plaintext: %s\n", plaintext);
+				fflush(stderr);
+				
+				char encrypted[strlen(plaintext) + 1];
+				encrypted[strlen(plaintext) + 1] = '\0';
+				char temp_plaintext[MAX_MSG_LEN + 1];
+			
+				temp_plaintext[MAX_MSG_LEN + 1] = '\0';
+				char temp_key[MAX_MSG_LEN + 1];
+				temp_key[MAX_MSG_LEN + 1] = '\0';
+				strncpy(temp_plaintext, plaintext, MAX_MSG_LEN);
+				strncpy(temp_key, key, MAX_MSG_LEN);
+				char result[MAX_MSG_LEN + 1];
+				result[MAX_MSG_LEN + 1] = '\0';
+				// Perform encryption in 1024 bit chunks
+				for(size_t advance = 0; advance < strlen(plaintext); advance += MAX_MSG_LEN){
+					encrypt_one_time_pad(temp_plaintext, key, result);
+					strncat(encrypted, result, strlen(result));
+					key += MAX_MSG_LEN;
+					plaintext += MAX_MSG_LEN;
+					memset(result, '\0', MAX_MSG_LEN);
+					strncpy(temp_plaintext, plaintext, MAX_MSG_LEN);
+					strncpy(temp_key, key, MAX_MSG_LEN);
+				}
+
+
+				// Return encrypted plaintext to client
+				snprintf(buffer, sizeof buffer, "%zu", strlen(encrypted));
+				fprintf(stderr, "Plaintext size atm: %jd\n", strlen(encrypted));
+				fflush(stderr);
+				while(strcmp(send_key(encrypted, connectionSocket, strlen(encrypted)), RESTART) == 0){
+					fprintf(stderr, "Restarting plaintext\n");
+					fflush(stderr);
+				}
+				fprintf(stderr, "Sent plaintext\n");
+				fflush(stderr);
 				exit(EXIT_SUCCESS);
 			}
       			// parent process

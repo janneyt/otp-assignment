@@ -21,35 +21,47 @@ char* send_key(char* key, int connectionSocket, size_t send_size){
 	snprintf(str_size, 100, "%zu", send_size);
 
 	strcpy(buffer, str_size);
-	printf("send_size: %lu\n", send_size);
-	fflush(stdout);
+	//printf("send_size: %lu\n", send_size);
+	//fflush(stdout);
 	// Send length
+	//fprintf(stderr, "Sending length: %s\n", buffer);
+	fprintf(stderr, "Sending length: %s\n", buffer);
+	fflush(stderr);
 	charsWritten = send(connectionSocket, buffer, MAX_MSG_LEN, 0);
 	if(charsWritten < 0){
-		send(connectionSocket, buffer, MAX_MSG_LEN, 0);
+		fprintf(stderr, "Restarting because no length sent due to error.\n");
+		fflush(stderr);
+		send(connectionSocket, RESTART, MAX_MSG_LEN, 0);
 		return RESTART;
 	}
-	fprintf(stderr, "1\n");
+	fprintf(stderr, "Waiting for Confirmation\n");
 	fflush(stderr);
 	memset(buffer, '\0', MAX_MSG_LEN);
 	charsWritten = recv(connectionSocket, buffer, MAX_MSG_LEN, 0);
 	if(charsWritten < 0 || strcmp(buffer, RESTART) == 0){
+		fprintf(stderr, "Received RESTART or error while waiting for length confirmation. charsWritten: %d. Buffer: %s\n", charsWritten, buffer);
+		fflush(stderr);
 		return RESTART;
 	}
-	fprintf(stderr, "2\n");
+	fprintf(stderr, "Confirm: %s\n", buffer);
 	fflush(stderr);
 	if(strcmp(buffer, CONFIRM) != 0){
+		fprintf(stderr, "Did not receive confirm\n");
+		fflush(stderr);
 		send(connectionSocket, RESTART, MAX_MSG_LEN, 0);
 		return RESTART;
 	}
+	fprintf(stderr, "Received confirmation, sending over key\n");
+	fflush(stderr);
 	for(size_t counter = 0; counter < send_size; counter += MAX_MSG_LEN){
-		key += MAX_MSG_LEN;
+		
 		charsWritten = send(connectionSocket, key, MAX_MSG_LEN, 0);
-		fprintf(stderr, "3 - charsWritten: %d strlen(key): %lu", charsWritten, strlen(key));
+		fprintf(stderr, "3 - charsWritten: %d strlen(key): %lu\n", charsWritten, strlen(key));
 		fflush(stderr);
 		if((int)strlen(key) < MAX_MSG_LEN ){
-			fprintf(stderr, "Not sure what to do, this is the problem, yeah?");
+			fprintf(stderr, "Not sure what to do, this is the problem, yeah? key: %s\n", key);
 			fflush(stderr);
+			return "SUCCESS";
 		}
 		if(charsWritten < MAX_MSG_LEN && (int)strlen(key) > MAX_MSG_LEN){
 			send(connectionSocket, RESTART, MAX_MSG_LEN, 0);
@@ -73,8 +85,10 @@ char* send_key(char* key, int connectionSocket, size_t send_size){
 			send(connectionSocket, RESTART, MAX_MSG_LEN, 0);
 			return RESTART;
 		}
+		fprintf(stderr, "Before advance");
+		fflush(stderr);
 		memset(buffer, '\0', MAX_MSG_LEN);
-		
+		key += MAX_MSG_LEN;
 	}
 	return "SUCCESS";
 }
@@ -98,8 +112,8 @@ char* key_read(char* key, FILE* stream){
 			strcat(key, buffer);
 		}
 	}
-	fprintf(stderr, "Inside key_read key_size: %jd", key_size);
-	fflush(stderr);
+//	fprintf(stderr, "Inside key_read key_size: %jd", key_size);
+//	fflush(stderr);
 	return key;
 }
 
@@ -107,39 +121,49 @@ char* read_key(char* key, int connectionSocket){
 	// Reads the key over the network, not from a file
 	// Returns "-1" for failure
 	char buffer[MAX_MSG_LEN + 1];
+	buffer[MAX_MSG_LEN + 1] = '\0';
 	int charsRead = -1;
 	size_t send_size = -1;
-	fprintf(stderr, "Looking for size of key");
+	fprintf(stderr, "Have I received the length?\n");
 	fflush(stderr);
-
+	//charsRead = recv(connectionSocket, buffer, MAX_MSG_LEN, 0);
 	// Have I received the length?
 	charsRead = recv(connectionSocket, buffer, MAX_MSG_LEN, 0);
 
 	// Did I receive anything?
 	while(charsRead < 0){
-		// No, I received nothing, restart everything because the socket errored
+		fprintf(stderr, "No, I received nothing, restart everything because the socket errored\n");
+		fflush(stderr);
 		send(connectionSocket, RESTART, MAX_MSG_LEN, 0);
 		return RESTART;
 	}
-	fprintf(stderr, "Key length transmitted to enc-server: %s\n", buffer);
-	fprintf(stderr, "Converting length of key to integer");
-	fflush(stderr);
 
+	fprintf(stderr, "Atoi buffer before: %s. charsRead: %d\n", buffer, charsRead);
+	fflush(stderr);
 	// Test to make sure we've actually grabbed a number/integer
 	if((send_size = atoi(buffer)) == 0){
-		// No, I received something that isn't an integer, the network is no synchronized
+		
+		fprintf(stderr, "No, I received something that isn't an integer, the network is not synchronized. Buffer: %s\n", buffer);
+		fflush(stderr);
 		send(connectionSocket, RESTART, MAX_MSG_LEN, 0);
 		return RESTART;
 	}
+	fprintf(stderr, "Atoi after\n");
+	fflush(stderr);
 
 	// Did we receive the restart signal?
 	if(strcmp(buffer, RESTART) == 0){
+		fprintf(stderr, "Restart signal received\n");
+		fflush(stderr);
 		return RESTART;
 	}
-
+	fprintf(stderr, "Sending CONFIRM");
+	fflush(stderr);
 	// Send length as a confirmation
 	charsRead = send(connectionSocket, CONFIRM, MAX_MSG_LEN, 0);
 	if(charsRead < 0){
+		fprintf(stderr, "Error while sending\n");
+		fflush(stderr);
 		send(connectionSocket, RESTART, MAX_MSG_LEN, 0);
 		return RESTART;
 	}
@@ -150,6 +174,8 @@ char* read_key(char* key, int connectionSocket){
 	// We now know the size of the total message, so key can be reallocated to it's maximum length
 	key = realloc(key, send_size + 1);
 	if(old_errno != errno){
+		fprintf(stderr, "Realloc problem");
+		fflush(stderr);
 		send(connectionSocket, RESTART, MAX_MSG_LEN, 0);
 		return RESTART;
 	}
@@ -161,30 +187,42 @@ char* read_key(char* key, int connectionSocket){
 	fflush(stderr);
 	// Actually receive the key
 	size_t counter = 0;
-	if(recv(connectionSocket, buffer, MAX_MSG_LEN, 0) < MAX_MSG_LEN ){
-		fprintf(stderr, "Huh");
-		fflush(stderr);
-	}
+	
 	while(counter < send_size ){
+		fprintf(stderr, "Counter: %lu\n", counter);
+		fflush(stderr);
 		// We need a positive number of bytes, as a zero byte message makes no sense in this context
-		if((charsRead = recv(connectionSocket, buffer, MAX_MSG_LEN, 0)) <= 0){
+		if((charsRead = recv(connectionSocket, buffer, MAX_MSG_LEN, 0)) < 0){
+			fprintf(stderr, "Restarting before the first MAX_MSG_LEN segment is received. charsRead: %d\n", charsRead);
+			fflush(stderr);
 			send(connectionSocket, RESTART, MAX_MSG_LEN, 0);
 			return RESTART;
 		};
-		if(strlen(buffer) < MAX_MSG_LEN){
-			fprintf(stderr, "Buffer is too short. Buffer: %s\n", buffer);
-			fflush(stderr);
-		}
+
 		// Did I receive restart? Then blank out key and start over because send function failed.
+		
 		if(strcmp(buffer, RESTART) == 0){
 			return RESTART;
 		}
+		if(strlen(buffer) < MAX_MSG_LEN){
+			fprintf(stderr, "Buffer is too short. Buffer: %s\nLength of buffer + counter: %lu", buffer, strlen(buffer) + counter);
+			fflush(stderr);
+			if(counter + strlen(buffer) >= send_size){
+				strcat(key, buffer);
+				return key;
+			}
+			
+			send(connectionSocket, RESTART, MAX_MSG_LEN, 0);
+			return RESTART;
+		}
+	
 		fprintf(stderr, "Inside loop\n");
 		fflush(stderr);
 		buffer[charsRead] = '\0';
 
 		// If we've overflowed the send_size, something's wrong. Restart everything.
 		if(strlen(key) + strlen(buffer) > send_size){
+
 			fprintf(stderr, "I'm leery of this one");
 			fflush(stderr);
 			charsRead = send(connectionSocket, RESTART, MAX_MSG_LEN, 0);
@@ -203,7 +241,7 @@ char* read_key(char* key, int connectionSocket){
 		fflush(stderr);
 		
 		// charsRead has to be an int, counter a size_t, so cast them to the same type for the addition.
-		counter += (size_t) charsRead;
+		counter += strlen(buffer);
 		printf("Counter: %ld\n", counter);
 		fflush(stdout);
 

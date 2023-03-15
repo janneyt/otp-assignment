@@ -121,9 +121,9 @@ int main(int argc, char *argv[]){
 		free(plaintext);
 		exit(EXIT_FAILURE);
 	}
-	printf("Length of key: %ld\n", strlen(key));
-	printf("Length of plaintext: %ld\n", strlen(plaintext));
-	fflush(stdout);
+	//printf("Length of key: %ld\n", strlen(key));
+	//printf("Length of plaintext: %ld\n", strlen(plaintext));
+	//fflush(stdout);
 	plaintext_size = strlen(plaintext);
 	key_size = strlen(key);
   	if(fclose(key_file) == EOF || fclose(plaintext_file) == EOF){
@@ -133,8 +133,8 @@ int main(int argc, char *argv[]){
 		exit(EXIT_FAILURE);
 	};
 
-	fprintf(stdout, "Key file successfully read into client\nPlaintexxt file successfully read into client\n");
-	fflush(stderr);
+	//fprintf(stdout, "Key file successfully read into client\nPlaintexxt file successfully read into client\n");
+	//fflush(stderr);
 
   	// Set up the server address struct 
   	setupAddressStruct(&serverAddress, portNumber, "localhost");
@@ -145,88 +145,76 @@ int main(int argc, char *argv[]){
 		free(plaintext);
 		error("CLIENT: ERROR connection");
   	}
-	fprintf(stdout, "Connecting to server\n");
-	fflush(stdout);
+	//fprintf(stdout, "Connecting to server\n");
+	//fflush(stdout);
   	// Wait for verification code from server
 	memset(buffer, '\0', MAX_MSG_LEN);
-  	charsWritten = recv(connectionSocket, buffer, MAX_MSG_LEN, 0);
-	printf("Verification code from server: %s", buffer);
-  	if(charsWritten < 0){
+	fprintf(stderr, "Waiting for SERVERICODE\n");
+	fflush(stderr);
+	charsWritten = recv(connectionSocket, buffer, MAX_MSG_LEN, 0);
+	printf("Received SERVERICODE**%s**\n", buffer);
+  	fflush(stdout);
+	if(charsWritten < 0){
 		free(key);
 		free(plaintext);
 		close(connectionSocket);
     		error("Could not receive verification from server");
   	}
-	fprintf(stdout, "Verifying...\n");
-	fflush(stdout);
-  	if(strcmp(buffer, "Who are you? I am enc-server.") != 0){
+	//fprintf(stdout, "Verifying...\n");
+	//fflush(stdout);
+  	if(strcmp(buffer, SERVERVERICODE) != 0){
 		free(key);
 		free(plaintext);
 		close(connectionSocket);
     		error("Wrong server.");
   	};
-	
-  	charsWritten = send(connectionSocket, "I am enc-client.", MAX_MSG_LEN, 0);
+	fprintf(stderr, "Sending CLIENTVERICODE\n");
+  	charsWritten = send(connectionSocket, CLIENTVERICODE, MAX_MSG_LEN, 0);
   	if(charsWritten < 0){
 		free(key);
 		free(plaintext);
     		error("Could not send verification back to server.");
   	};
-	strcpy(buffer, "");
-	while(strcmp(VERIFICATION_RECEIVED, buffer) != 0){
-		charsWritten = recv(connectionSocket, buffer, MAX_MSG_LEN, 0);
-		if(charsWritten < 0){
-			free(key);
-			free(plaintext);
-			error("Server disconnected");
-		}
+	memset(buffer, '\0', MAX_MSG_LEN);
+	fprintf(stderr, "Waiting for verification received\n");
+	fflush(stderr);
+	charsWritten = recv(connectionSocket, buffer, MAX_MSG_LEN, 0);
+
+	if(strcmp(VERIFICATION_RECEIVED, buffer) != 0 || charsWritten < 0){
+		free(key);
+		free(plaintext);
+		error("Server disconnected");
+		
 
 	}
+	fprintf(stderr, "Received: %s\n", buffer);
+	fflush(stderr);
 	snprintf(buffer, sizeof buffer, "%zu", strlen(key));
-	fprintf(stderr, "Key size atm: %jd", key_size);
+	fprintf(stderr, "Key size atm: %jd\n", key_size);
 	while(strcmp(send_key(key, connectionSocket, key_size), RESTART) == 0){
 		fprintf(stderr, "Restarting key\n");
 		fflush(stderr);
+		
 	}
-	fprintf(stderr, "Sent size: %ld\n", strlen(key));
+	fprintf(stderr, "Sent key. Sending plaintext.\n");
 	fflush(stderr);
-	fflush(stdout);
-	char temp_buffer[MAX_MSG_LEN + 1];
 	
-	// Wait for the confirmation (the length)
-	while(strcmp(temp_buffer, RECEIVED_LENGTH) != 0){
-		charsWritten = recv(connectionSocket, temp_buffer, MAX_MSG_LEN, 0);
-		fprintf(stderr, "Temp buffer: %s\n", temp_buffer);
-		fflush(stderr);
-	}
-
-	if(strcmp(temp_buffer, buffer) != 0){
-		fprintf(stderr, "The lengths don't match");
-		close(connectionSocket);
-		free(key);
-		free(plaintext);
-		exit(EXIT_SUCCESS);
-	}
-
-	while(strcmp(send_key(plaintext, connectionSocket, plaintext_size), RESTART) == 0){
+	snprintf(buffer, sizeof buffer, "%zu", strlen(plaintext));
+	fprintf(stderr, "Plaintext size atm: %jd\n", strlen(plaintext));
+	while(strcmp(send_key(plaintext, connectionSocket, strlen(plaintext)), RESTART) == 0){
 		fprintf(stderr, "Restarting plaintext\n");
 		fflush(stderr);
 	}
-	fprintf(stderr, "Sent size: %ld\n", strlen(plaintext));
+
+	fprintf(stderr, "Sent plaintext. Receiving encrypted text\n");
 	fflush(stderr);
-	fflush(stdout);
 
-	// And wait for confirmation
-	while(strcmp(temp_buffer, RECEIVED_LENGTH) != 0){
-		charsWritten = recv(connectionSocket, temp_buffer, strlen(RECEIVED_LENGTH), 0);
-		fprintf(stderr, "Temp buffer: %s\n", temp_buffer);
-		fflush(stderr);
-	}
-	
-
-
-	// Wait for the encrypted return text
-	
+	char* encrypted = calloc(MAX_MSG_LEN, sizeof(char));
+	while(strcmp(read_key(encrypted, connectionSocket), RESTART) == 0){
+		encrypted = calloc(MAX_MSG_LEN, sizeof(char));
+	} 
+	fprintf(stderr, "Encrypted message: %s\n", encrypted);
+	fflush(stderr);
 
   	// Close the socket
   	close(connectionSocket);
