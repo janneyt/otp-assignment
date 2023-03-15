@@ -1,9 +1,13 @@
+# define _POSIX_C_SOURCE 200809L
 # include <stdlib.h>
+# include <stdio.h>
 # include <unistd.h>
+
 # include <string.h>
 # include <sys/types.h>
 # include <sys/socket.h>
 # include <netdb.h>
+# include <string.h>
 # ifndef  key_size
 # include "constants.h"
 # include "reading_funcs.h"
@@ -40,11 +44,18 @@ void setupAddressStruct(struct sockaddr_in* address, int portNumber, char* hostn
 }
 
 int main(int argc, char *argv[]){
-  	int connectionSocket, portNumber, charsWritten;
+  	/**
+	 * The main loop calls sets up and calls the more specialized function for sending and receiving data and encryption.
+	 *
+	 * argv[1] is the plaintext, argv[2] is the key, argv[3] is the port.
+	 *
+	 */
+
+	int connectionSocket, portNumber, charsWritten = -1;
   	struct sockaddr_in serverAddress;
   	char buffer[MAX_MSG_LEN + 1] = "";
-  	FILE* key_file;
-	FILE* plaintext_file;
+  	FILE* key_file = stdin;
+	FILE* plaintext_file = stdin;
 	size_t key_size = MAX_MSG_LEN * 2;
 	size_t plaintext_size = MAX_MSG_LEN * 2;
 	char* key = malloc((sizeof(char *) * (key_size + 1)));
@@ -65,9 +76,15 @@ int main(int argc, char *argv[]){
 		free(plaintext);
 		error("Port number is 0x0");
   	}
+
+	// See function stub for argv index values
 	strcpy(key, argv[2]);
   	strcpy(plaintext, argv[1]);
-	portNumber = atoi(argv[3]);
+
+	// Make sure the port number is valid and not a reserved number
+	if((portNumber = atoi(argv[3])) == 0){
+		error("Port number is not a number. Please try again.\n");
+	};
 	if(portNumber < 1000 || portNumber > 65545){
 		free(key);
 		free(plaintext);
@@ -103,6 +120,11 @@ int main(int argc, char *argv[]){
 	plaintext = calloc(plaintext_size + 1, sizeof(char));
 	plaintext[plaintext_size + 1] = '\0';
 	key[key_size + 1] = '\0';
+
+	/**
+	 * Plaintext should mirror key, as they use the same function for sending and receiving. However, the key_size variable
+	 * should only be set by the strlen(key) function. Key_
+	 * */
 	if(key == NULL){
 		free(key);
 		free(plaintext);
@@ -113,17 +135,16 @@ int main(int argc, char *argv[]){
 		free(plaintext);
 		error("Could not reset plaintext");
 	}
-	key = key_read(key, key_file);
 	plaintext = key_read(plaintext, plaintext_file);
+	key = key_read(key, key_file);
+
 	if(strlen(key) < strlen(plaintext)){
 		fprintf(stderr, "Key is shorter than plaintext, which is cryptographically insecure");
 		free(key);
 		free(plaintext);
 		exit(EXIT_FAILURE);
 	}
-	//printf("Length of key: %ld\n", strlen(key));
-	//printf("Length of plaintext: %ld\n", strlen(plaintext));
-	//fflush(stdout);
+
 	plaintext_size = strlen(plaintext);
 	key_size = strlen(key);
   	if(fclose(key_file) == EOF || fclose(plaintext_file) == EOF){
@@ -133,8 +154,10 @@ int main(int argc, char *argv[]){
 		exit(EXIT_FAILURE);
 	};
 
-	//fprintf(stdout, "Key file successfully read into client\nPlaintexxt file successfully read into client\n");
-	//fflush(stderr);
+	/** Key file successfully read into client and plaintexxt file successfully read into client
+	 *  
+	 *  Time to send off to server.
+	*/
 
   	// Set up the server address struct 
   	setupAddressStruct(&serverAddress, portNumber, "localhost");
@@ -145,39 +168,37 @@ int main(int argc, char *argv[]){
 		free(plaintext);
 		error("CLIENT: ERROR connection");
   	}
-	//fprintf(stdout, "Connecting to server\n");
-	//fflush(stdout);
+
+	/**
+	 * This is an elaborate identification routine that uses constants in constants.h to identify client and server and make sure we're 
+	 * correctly communicating with the correct server.
+	 * */
   	// Wait for verification code from server
 	memset(buffer, '\0', MAX_MSG_LEN);
-	fprintf(stderr, "Waiting for SERVERICODE\n");
-	fflush(stderr);
 	charsWritten = recv(connectionSocket, buffer, MAX_MSG_LEN, 0);
-	printf("Received SERVERICODE**%s**\n", buffer);
-  	fflush(stdout);
 	if(charsWritten < 0){
 		free(key);
 		free(plaintext);
 		close(connectionSocket);
     		error("Could not receive verification from server");
   	}
-	//fprintf(stdout, "Verifying...\n");
-	//fflush(stdout);
-  	if(strcmp(buffer, SERVERVERICODE) != 0){
+	if(strcmp(buffer, SERVERVERICODE) != 0){
 		free(key);
 		free(plaintext);
 		close(connectionSocket);
     		error("Wrong server.");
   	};
-	fprintf(stderr, "Sending CLIENTVERICODE\n");
-  	charsWritten = send(connectionSocket, CLIENTVERICODE, MAX_MSG_LEN, 0);
+	
+	// We've received the SERVERICODE, send CLIENTVERICODE
+	charsWritten = send(connectionSocket, CLIENTVERICODE, MAX_MSG_LEN, 0);
   	if(charsWritten < 0){
 		free(key);
 		free(plaintext);
     		error("Could not send verification back to server.");
   	};
 	memset(buffer, '\0', MAX_MSG_LEN);
-	fprintf(stderr, "Waiting for verification received\n");
-	fflush(stderr);
+	
+	// Receive the verification received code (syn-ack)
 	charsWritten = recv(connectionSocket, buffer, MAX_MSG_LEN, 0);
 
 	if(strcmp(VERIFICATION_RECEIVED, buffer) != 0 || charsWritten < 0){
@@ -187,40 +208,64 @@ int main(int argc, char *argv[]){
 		
 
 	}
-	fprintf(stderr, "Received: %s\n", buffer);
-	fflush(stderr);
+
+	/*
+	 * By this point, we know that we've connected to a valid server, so it's time to actully encrypt the plaintext with the key
+	 *
+	 * The functions used are the exact same for keys and plaintext, one for sending, one for receiving
+	 * */
 	snprintf(buffer, sizeof buffer, "%zu", strlen(key));
-	fprintf(stderr, "Key size atm: %jd\n", key_size);
-	while(strcmp(send_key(key, connectionSocket, key_size), RESTART) == 0){
-		fprintf(stderr, "Restarting key\n");
-		fflush(stderr);
+	char* result = RESTART;
+	char* old_key = strndup(key, strlen(key));
+	while(strcmp((result = send_key(key, connectionSocket, key_size)), RESTART) == 0){
+		// Check that key wasn't corrupted somehow
+		if(strcmp(old_key, key) != 0){
+			free(key);
+			free(plaintext);
+			
+			error("Key has been irrevocably corrupted. Exiting and try again.");
+		}
+
+		// Since we want an endless loop until RESTART is *not* returned, just continue
+		continue;	
 		
 	}
-	fprintf(stderr, "Sent key. Sending plaintext.\n");
-	fflush(stderr);
-	
-	snprintf(buffer, sizeof buffer, "%zu", strlen(plaintext));
-	fprintf(stderr, "Plaintext size atm: %jd\n", strlen(plaintext));
-	while(strcmp(send_key(plaintext, connectionSocket, strlen(plaintext)), RESTART) == 0){
-		fprintf(stderr, "Restarting plaintext\n");
+	if(strcmp(result, SUCCESS) != 0){
+		fprintf(stderr, "Didn't return SUCCESS");
 		fflush(stderr);
 	}
 
-	fprintf(stderr, "Sent plaintext. Receiving encrypted text\n");
-	fflush(stderr);
+	snprintf(buffer, sizeof buffer, "%zu", strlen(plaintext));
+	char* old_plaint = strndup(key, strlen(key));
+	while(strcmp(send_key(plaintext, connectionSocket, strlen(plaintext)), RESTART) == 0){
+		if(strcmp(plaintext, old_plaint) != 0){
+			free(key);
+			free(plaintext);
+			error("Plaintext has been irrevocably corrupted. Exiting and try again.");
+		}
+		continue;
+	}
+	if(strcmp(result, SUCCESS) != 0){
+		fprintf(stderr, "Didn't return SUCCESS with plaintext");
+		fflush(stderr);
+	}
 
 	char* encrypted = calloc(MAX_MSG_LEN, sizeof(char));
 	while(strcmp(read_key(encrypted, connectionSocket), RESTART) == 0){
+		
+		// Unlike the earlier plaintext/key functions, we don't have to store a value to send, we're receiving a value.
+		// If we're restarting, just wipe the garbled gunk from the last attempt.
 		encrypted = calloc(MAX_MSG_LEN, sizeof(char));
-	} 
-	fprintf(stderr, "Encrypted message: %s\n", encrypted);
-	fflush(stderr);
+	}
+
+	// Ironically, this is the line we're graded on. The newline at the end is for text file generation.
+	fprintf(stdout, "%s\n", encrypted);
+	fflush(stdout);
 
   	// Close the socket
   	close(connectionSocket);
-	fprintf(stdout, "Closing as all tasks are complete");
-  	fflush(stdout);
-	fflush(stderr);
-  	free(key);free(plaintext);
+ 	free(key);
+	free(plaintext);
+	free(encrypted);
 	exit(EXIT_SUCCESS);
 }

@@ -77,8 +77,6 @@ int main (int argc, char *argv[])
 		fprintf(stderr, "Waiting for threads to be in valid range\n");
 		fflush(stderr);
 	}
-	//printf("Opening socket\n");
-	//fflush(stdout);
  	// Blank out serverAddress
     	struct sockaddr_in serverAddress;
 
@@ -93,9 +91,7 @@ int main (int argc, char *argv[])
     	}
 	
 	while (bind (listenSocket, (struct sockaddr *)&serverAddress, sizeof (serverAddress)) != 0){
-      		perror("");
-		sleep(1);
-		fprintf(stderr, "Waiting for binding\n");
+		fprintf(stderr, "Binding is failing");
 		fflush(stderr);
 		continue;
 	}
@@ -106,8 +102,7 @@ int main (int argc, char *argv[])
 	};
  
 	while(num_threads < NUM_THREADS){
-		//fprintf(stderr, "Num threads: %d\n", num_threads);
-		//fflush(stderr);
+
     		if(num_threads < 0){
 			fprintf(stderr, "Threads cannot be negative\n");
 			fflush(stderr);
@@ -138,8 +133,6 @@ int main (int argc, char *argv[])
 	      			memset (buffer, '\0', MAX_MSG_LEN);
 	      
         			// Verification it's the client
-				fprintf(stderr, "Sending SERVERICODE\n");
-				fflush(stderr);
         			charsRead = send(connectionSocket, SERVERVERICODE, MAX_MSG_LEN, 0);
         			if(charsRead < 0){
 					fprintf(stderr, "Sending verification request failed\n");
@@ -149,8 +142,7 @@ int main (int argc, char *argv[])
         			}
 
         			// Get the client's verification code
-				fprintf(stderr, "Waiting for CLIENTVERICODE\n");
-				fflush(stderr);
+			
         			charsRead = recv(connectionSocket, buffer, MAX_MSG_LEN, 0);
         			if(charsRead < 0){
           				
@@ -160,17 +152,13 @@ int main (int argc, char *argv[])
 					exit(EXIT_FAILURE);
 				}
 
-				fprintf(stderr, "Testing for client's verification: %s\n", buffer);
-				fflush(stderr);
-        			if(strcmp(buffer, CLIENTVERICODE) != 0){
+				if(strcmp(buffer, CLIENTVERICODE) != 0){
           				fprintf(stderr, "Verification failed\n");
 					fflush(stderr);
 					close(connectionSocket);
 					error("Could not trust client");
         			}
 
-				fprintf(stderr, "Sending VERIFICATION RECEIVED to client\n");
-				fflush(stderr);
         			charsRead = send(connectionSocket, VERIFICATION_RECEIVED, 39, 0);
         			if(charsRead < 0){
 					fprintf(stderr, "Sending verification received failed\n");
@@ -178,26 +166,20 @@ int main (int argc, char *argv[])
 					close(connectionSocket);
           				error("Did not request key from client.");
         			}
-				fprintf(stderr, "Verification received and sent. Getting key\n");
-				fflush(stderr);
-				
+			
 				// Get key
 				char* key = calloc(MAX_MSG_LEN, sizeof(char));
 				while(strcmp(read_key(key, connectionSocket), RESTART) == 0){
 					//exit(EXIT_FAILURE);
 					key = calloc(MAX_MSG_LEN, sizeof(char));
 				};
-				fprintf(stderr, "Key after key readin: %s\n", key);
-				fflush(stderr);
 
 				// Get plaintext
 				char* plaintext = calloc(MAX_MSG_LEN, sizeof(char));
 				while(strcmp(read_key(plaintext, connectionSocket), RESTART) == 0){
 					plaintext = calloc(MAX_MSG_LEN, sizeof(char));
 				}
-				fprintf(stderr, "Plaintext: %s\n", plaintext);
-				fflush(stderr);
-				
+							
 				char encrypted[strlen(plaintext) + 1];
 				encrypted[strlen(plaintext) + 1] = '\0';
 				char temp_plaintext[MAX_MSG_LEN + 1];
@@ -211,7 +193,11 @@ int main (int argc, char *argv[])
 				result[MAX_MSG_LEN + 1] = '\0';
 				// Perform encryption in 1024 bit chunks
 				for(size_t advance = 0; advance < strlen(plaintext); advance += MAX_MSG_LEN){
-					encrypt_one_time_pad(temp_plaintext, key, result);
+					if(encrypt_one_time_pad(temp_plaintext, key, result) == EXIT_FAILURE){
+						fprintf(stderr,"Could not encrypt");
+						fflush(stderr);
+						exit(EXIT_FAILURE);
+					};
 					strncat(encrypted, result, strlen(result));
 					key += MAX_MSG_LEN;
 					plaintext += MAX_MSG_LEN;
@@ -223,14 +209,10 @@ int main (int argc, char *argv[])
 
 				// Return encrypted plaintext to client
 				snprintf(buffer, sizeof buffer, "%zu", strlen(encrypted));
-				fprintf(stderr, "Plaintext size atm: %jd\n", strlen(encrypted));
-				fflush(stderr);
 				while(strcmp(send_key(encrypted, connectionSocket, strlen(encrypted)), RESTART) == 0){
 					fprintf(stderr, "Restarting plaintext\n");
 					fflush(stderr);
 				}
-				fprintf(stderr, "Sent plaintext\n");
-				fflush(stderr);
 				exit(EXIT_SUCCESS);
 			}
       			// parent process
@@ -247,6 +229,8 @@ int main (int argc, char *argv[])
 					fflush(stderr);
 					close(connectionSocket);
 					num_threads--;
+					printf("Num threads: %d", num_threads);
+					fflush(stdout);
 				} else {
 					fprintf(stderr, "Looping\n");
 					fflush(stderr);

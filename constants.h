@@ -9,4 +9,5 @@
 # define CONFIRM		"CONFIRM"
 # define SERVERVERICODE         "I am the server"
 # define CLIENTVERICODE		"I am the client"
+# define SUCCESS		"SUCCESS"
 extern size_t key_size;
