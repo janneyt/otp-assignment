@@ -19,7 +19,9 @@ char* send_key(char* key, int connectionSocket, size_t send_size){
 	int charsWritten = -1;
 	char str_size[100];
 	snprintf(str_size, 100, "%zu", send_size);
-
+	if(key == NULL){
+		return NOKEY;
+	}
 	strcpy(buffer, str_size);
 
 	charsWritten = send(connectionSocket, buffer, MAX_MSG_LEN, 0);
@@ -102,13 +104,13 @@ char* key_read(char* key, FILE* stream){
 		if((key_length + MAX_MSG_LEN) > (key_size / 2)){
 			key_size *= 2;
 			int old_errno = errno;
-			char* temp_key = malloc(2);
-			if((temp_key = realloc(key, key_size + 1)) == NULL){
-				free(temp_key);
+			//char* temp_key = malloc(1);
+			if((key = realloc(key, key_size + 1)) == NULL){
+				//free(temp_key);
 				perror("Could not realloc to fit next key size");
 				return NULL;
 			}
-			key = temp_key;
+			
 			if(old_errno != errno){
 				perror("Realloc failed");
 				return NULL;
@@ -156,7 +158,7 @@ char* read_key(char* key, int connectionSocket){
 	// Test to make sure we've actually grabbed a number/integer
 	if((send_size = atoi(buffer)) == 0){
 		
-		fprintf(stderr, "No, I received something that isn't an integer, the network is not synchronized. Buffer: %s\n", buffer);
+		fprintf(stderr, "I received something that isn't an integer, the network is not synchronized. Buffer: %s\n", buffer);
 		fflush(stderr);
 		send(connectionSocket, RESTART, MAX_MSG_LEN, 0);
 		return RESTART;
@@ -253,6 +255,7 @@ char* read_key(char* key, int connectionSocket){
 		charsRead = send(connectionSocket, CONFIRM, MAX_MSG_LEN, 0);
 		memset(buffer, '\0', MAX_MSG_LEN);
 	};
+	key[send_size] = '\0';
 	return key;
 }
 

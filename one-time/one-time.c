@@ -28,8 +28,10 @@ int encrypt_one_time_pad(char* message, char* key, char* result)
         return EXIT_FAILURE;
     }
 
+    size_t mes_len = strlen(message);
+
     /* Encrypt the message using one-time pad */
-    for (size_t i = 0; i < strlen(message); i++) {
+    for (size_t i = 0; i < mes_len; i++) {
 	if(message[i] > 122 || message[i] < 65 || ( message[i] > 90 && message[i] < 97)){
 		if(message[i] != 32){
 			fprintf(stdout, "enc_client error: input contains bad characters. %c.", message[i]);
@@ -69,8 +71,9 @@ int decrypt_one_time_pad(char message[MAX_MSG_LEN + 1], char key[MAX_MSG_LEN + 1
         return EXIT_FAILURE;
     }
 
+    size_t mes_len = strlen(message);
     /* Encrypt the message using one-time pad */
-    for (size_t i = 0; i < strlen(message); i++) {
+    for (size_t i = 0; i < mes_len; i++) {
 	if(message[i] > 122 || message[i] < 65 || ( message[i] > 90 && message[i] < 97)){
 		if(message[i] != 32){
 			fprintf(stdout, "enc_client error: input contains bad characters. %c.", message[i]);

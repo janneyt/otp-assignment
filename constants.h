@@ -10,4 +10,5 @@
 # define SERVERVERICODE         "I am the server"
 # define CLIENTVERICODE		"I am the client"
 # define SUCCESS		"SUCCESS"
+# define NOKEY			"No key"
 extern size_t key_size;
