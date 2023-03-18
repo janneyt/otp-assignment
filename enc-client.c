@@ -59,11 +59,13 @@ int main(int argc, char *argv[]){
 	size_t key_size = MAX_MSG_LEN * 2;
 	size_t plaintext_size = MAX_MSG_LEN * 2;
 	char* key = malloc((sizeof(char *) * (key_size + 1)));
+	char keyname[MAX_MSG_LEN] = {0};
 	char* plaintext = malloc(sizeof(char) * (plaintext_size + 1));
+	char plaintext_name[MAX_MSG_LEN] = {0};
 	*plaintext = '\0';
 	key[key_size+1] = '\0';
 	// Check usage & args
-  	if(argc < 4){
+  	if(argc != 4){
     		fprintf(stderr, "USAGE: %s plaintext key port\n", argv[0]);
 		free(key);
 		free(plaintext);
@@ -78,8 +80,8 @@ int main(int argc, char *argv[]){
   	}
 
 	// See function stub for argv index values
-	strcpy(key, argv[2]);
-  	strcpy(plaintext, argv[1]);
+	strcpy(keyname, argv[2]);
+  	strcpy(plaintext_name, argv[1]);
 
 	// Make sure the port number is valid and not a reserved number
 	if((portNumber = atoi(argv[3])) == 0){
@@ -100,7 +102,7 @@ int main(int argc, char *argv[]){
   	}
 
 	// Acquire key from keyfile
-  	key_file = fopen(key, "r+");
+  	key_file = fopen(keyname, "r+");
   	if(key_file == NULL){
 		free(key);
 		free(plaintext);
@@ -108,7 +110,7 @@ int main(int argc, char *argv[]){
   	};
 
 	// Acquire plaintext from plaintext file
-	plaintext_file = fopen(plaintext, "r+");
+	plaintext_file = fopen(plaintext_name, "r+");
 	if(plaintext_file == NULL){
 		free(key);
 		free(plaintext);
@@ -116,10 +118,8 @@ int main(int argc, char *argv[]){
 	}
 
 	// I saved the file name in key, but now I'm using key to actually hold the key. This resets the key.
-	key = calloc(key_size + 1, sizeof(char ));
-	plaintext = calloc(plaintext_size + 1, sizeof(char));
-	plaintext[plaintext_size + 1] = '\0';
-	key[key_size + 1] = '\0';
+	plaintext[plaintext_size] = '\0';
+	key[key_size] = '\0';
 
 	/**
 	 * Plaintext should mirror key, as they use the same function for sending and receiving. However, the key_size variable

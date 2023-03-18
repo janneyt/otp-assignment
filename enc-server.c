@@ -52,7 +52,7 @@ int main (int argc, char *argv[])
 	assert(strcmp(message, result2) == 0);
   	int connectionSocket, charsRead;
   	char buffer[MAX_MSG_LEN + 1];
-  	buffer[MAX_MSG_LEN + 1] = '\0';
+  	buffer[MAX_MSG_LEN] = '\0';
   	struct sockaddr_in clientAddress;
 	int num_threads = 0;
   	socklen_t sizeOfClientInfo = sizeof (clientAddress);
@@ -181,7 +181,7 @@ int main (int argc, char *argv[])
 				}
 							
 				char encrypted[strlen(plaintext) + 1];
-				encrypted[strlen(plaintext) + 1] = '\0';
+				encrypted[strlen(plaintext)] = '\0';
 				char temp_plaintext[MAX_MSG_LEN + 1];
 			
 				temp_plaintext[MAX_MSG_LEN + 1] = '\0';

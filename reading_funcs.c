@@ -14,8 +14,8 @@
 
 char* send_key(char* key, int connectionSocket, size_t send_size){
 	// Sends key across the network
-	char buffer[MAX_MSG_LEN + 1];
-	buffer[MAX_MSG_LEN + 1] = '\0';
+	char buffer[MAX_MSG_LEN + 1] = {0};
+	buffer[MAX_MSG_LEN] = '\0';
 	int charsWritten = -1;
 	char str_size[100];
 	snprintf(str_size, 100, "%zu", send_size);
@@ -87,12 +87,21 @@ char* key_read(char* key, FILE* stream){
 	 *
 	 * I'm assuming that key is malloc'd, as key MUST be a pointer returned from malloc, calloc or realloc.
 	 * */
-	char buffer[MAX_MSG_LEN + 1];
-	key[key_size + 1] = '\0';
+	char buffer[MAX_MSG_LEN + 1] = {0};
+	buffer[MAX_MSG_LEN] = '\0';
+	key[key_size] = '\0';
+	
+	// This makes strlen(key) work on uninitialized malloc'd key
+	*key = '\0';
+	size_t key_length = strlen(key);
 	char* received;
+
+	// Note on key_length and key_size. Key_size controls the amount of memory to be allocated and works on the same principle
+	// as certain types of hashing algorithms - when you're at fifty percent capacity, double.
+	// Key_length, on the other hand, is to avoid excessive strlen(key) calls. It's just the accumulated length of the key *string* plus the new string and can be up to 49% the size of key_size.
 	while((received = fgets(buffer, MAX_MSG_LEN, stream)) != NULL){
-		buffer[strlen(received) + 1] = '\0';
-		if((strlen(key) + MAX_MSG_LEN) > (key_size / 2)){
+		buffer[MAX_MSG_LEN] = '\0';
+		if((key_length + MAX_MSG_LEN) > (key_size / 2)){
 			key_size *= 2;
 			int old_errno = errno;
 			if((key = realloc(key, key_size + 1)) == NULL){
@@ -103,11 +112,12 @@ char* key_read(char* key, FILE* stream){
 				perror("Realloc failed");
 				return NULL;
 			}
-			key[key_size + 1] = '\0';
+			key[key_size] = '\0';
 			strcat(key, buffer);
 		} else {
 			strcat(key, buffer);
 		}
+		key_length += strlen(buffer);
 	}
 	return key;
 }
@@ -128,8 +138,8 @@ char* read_key(char* key, int connectionSocket){
 	 * Note that freeing, like mallocing, is handled by the calling function. It's extremely important to understand that free must be called 
 	 * on key somewhere else.
 	 * */
-	char buffer[MAX_MSG_LEN + 1];
-	buffer[MAX_MSG_LEN + 1] = '\0';
+	char buffer[MAX_MSG_LEN + 1] = {0};
+	buffer[MAX_MSG_LEN] = '\0';
 	int charsRead = -1;
 	size_t send_size = -1;
 	
@@ -237,7 +247,7 @@ char* read_key(char* key, int connectionSocket){
 		counter += strlen(buffer);
 
 		// This is a running null terminator since we can't guaratee the network sends it.
-		key[counter + 1] = '\0';
+		key[counter] = '\0';
 		strcat(key, buffer);
 		//fprintf(stderr, "Characters read: %d\nStrlen of buffer: %lu\nStrlen of key: %lu\n", charsRead, strlen(buffer), strlen(key));
 		//fflush(stderr);
