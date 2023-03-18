@@ -89,34 +89,33 @@ char* key_read(char* key, FILE* stream){
 	 * */
 	char buffer[MAX_MSG_LEN + 1] = {0};
 	buffer[MAX_MSG_LEN] = '\0';
-	key[key_size] = '\0';
 	
 	// This makes strlen(key) work on uninitialized malloc'd key
 	*key = '\0';
-	size_t key_length = strlen(key);
-	char* received;
+	size_t key_length = 0;
 
 	// Note on key_length and key_size. Key_size controls the amount of memory to be allocated and works on the same principle
 	// as certain types of hashing algorithms - when you're at fifty percent capacity, double.
 	// Key_length, on the other hand, is to avoid excessive strlen(key) calls. It's just the accumulated length of the key *string* plus the new string and can be up to 49% the size of key_size.
-	while((received = fgets(buffer, MAX_MSG_LEN, stream)) != NULL){
-		buffer[MAX_MSG_LEN] = '\0';
+	while((fgets(buffer, MAX_MSG_LEN, stream)) != NULL){
+		buffer[strlen(buffer)] = '\0';
 		if((key_length + MAX_MSG_LEN) > (key_size / 2)){
 			key_size *= 2;
 			int old_errno = errno;
-			if((key = realloc(key, key_size + 1)) == NULL){
+			char* temp_key = malloc(2);
+			if((temp_key = realloc(key, key_size + 1)) == NULL){
+				free(temp_key);
 				perror("Could not realloc to fit next key size");
 				return NULL;
 			}
+			key = temp_key;
 			if(old_errno != errno){
 				perror("Realloc failed");
 				return NULL;
 			}
-			key[key_size] = '\0';
-			strcat(key, buffer);
-		} else {
-			strcat(key, buffer);
-		}
+			key[key_length] = '\0';
+		} 
+		strcat(key, buffer);
 		key_length += strlen(buffer);
 	}
 	return key;

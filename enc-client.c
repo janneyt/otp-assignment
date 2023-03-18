@@ -13,7 +13,7 @@
 # include "reading_funcs.h"
 # endif
 
-size_t key_size = MAX_MSG_LEN + 1;
+size_t key_size = MAX_MSG_LEN * 2;
 
 // Error function for reporting issues
 void error(const char *msg) {
@@ -53,17 +53,17 @@ int main(int argc, char *argv[]){
 
 	int connectionSocket, portNumber, charsWritten = -1;
   	struct sockaddr_in serverAddress;
-  	char buffer[MAX_MSG_LEN + 1] = "";
+  	char buffer[MAX_MSG_LEN + 1];
   	FILE* key_file = stdin;
 	FILE* plaintext_file = stdin;
-	size_t key_size = MAX_MSG_LEN * 2;
 	size_t plaintext_size = MAX_MSG_LEN * 2;
-	char* key = malloc((sizeof(char *) * (key_size + 1)));
+	char* key = malloc( key_size + 1);
 	char keyname[MAX_MSG_LEN] = {0};
-	char* plaintext = malloc(sizeof(char) * (plaintext_size + 1));
+	char* plaintext = malloc(plaintext_size + 1);
 	char plaintext_name[MAX_MSG_LEN] = {0};
 	*plaintext = '\0';
-	key[key_size+1] = '\0';
+	*key = '\0';
+	key[key_size] = '\0';
 	// Check usage & args
   	if(argc != 4){
     		fprintf(stderr, "USAGE: %s plaintext key port\n", argv[0]);
@@ -135,7 +135,9 @@ int main(int argc, char *argv[]){
 		free(plaintext);
 		error("Could not reset plaintext");
 	}
+	size_t old_key_size = key_size;
 	plaintext = key_read(plaintext, plaintext_file);
+	key_size = old_key_size;
 	key = key_read(key, key_file);
 
 	if(strlen(key) < strlen(plaintext)){
@@ -251,11 +253,13 @@ int main(int argc, char *argv[]){
 	}
 
 	char* encrypted = calloc(MAX_MSG_LEN, sizeof(char));
+	encrypted[MAX_MSG_LEN] = '\0';
 	while(strcmp(read_key(encrypted, connectionSocket), RESTART) == 0){
 		
 		// Unlike the earlier plaintext/key functions, we don't have to store a value to send, we're receiving a value.
 		// If we're restarting, just wipe the garbled gunk from the last attempt.
 		encrypted = calloc(MAX_MSG_LEN, sizeof(char));
+		encrypted[MAX_MSG_LEN] = '\0';
 	}
 
 	// Ironically, this is the line we're graded on. The newline at the end is for text file generation.

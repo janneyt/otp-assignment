@@ -51,7 +51,7 @@ int main (int argc, char *argv[])
 	//fprintf(stderr, "Result: %s\nResult2: %s\n", result, result2);
 	assert(strcmp(message, result2) == 0);
   	int connectionSocket, charsRead;
-  	char buffer[MAX_MSG_LEN + 1];
+  	char buffer[MAX_MSG_LEN + 1] = {0};
   	buffer[MAX_MSG_LEN] = '\0';
   	struct sockaddr_in clientAddress;
 	int num_threads = 0;
@@ -182,15 +182,15 @@ int main (int argc, char *argv[])
 							
 				char encrypted[strlen(plaintext) + 1];
 				encrypted[strlen(plaintext)] = '\0';
-				char temp_plaintext[MAX_MSG_LEN + 1];
+				char temp_plaintext[MAX_MSG_LEN + 1] = "";
 			
-				temp_plaintext[MAX_MSG_LEN + 1] = '\0';
-				char temp_key[MAX_MSG_LEN + 1];
-				temp_key[MAX_MSG_LEN + 1] = '\0';
+				temp_plaintext[MAX_MSG_LEN] = '\0';
+				char temp_key[MAX_MSG_LEN + 1] = "";
+				temp_key[MAX_MSG_LEN] = '\0';
 				strncpy(temp_plaintext, plaintext, MAX_MSG_LEN);
 				strncpy(temp_key, key, MAX_MSG_LEN);
-				char result[MAX_MSG_LEN + 1];
-				result[MAX_MSG_LEN + 1] = '\0';
+				char result[MAX_MSG_LEN + 1] = {0};
+				result[MAX_MSG_LEN] = '\0';
 				// Perform encryption in 1024 bit chunks
 				for(size_t advance = 0; advance < strlen(plaintext); advance += MAX_MSG_LEN){
 					if(encrypt_one_time_pad(temp_plaintext, key, result) == EXIT_FAILURE){
