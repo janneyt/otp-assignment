@@ -135,7 +135,7 @@ int main (int argc, char *argv[])
 	      				memset (buffer, '\0', MAX_MSG_LEN);
 	      
         				// Verification it's the client
-        				charsRead = send(connectionSocket, SERVERVERICODE, MAX_MSG_LEN, 0);
+        				charsRead = send(connectionSocket, SERVERENCVERICODE, MAX_MSG_LEN, 0);
         				if(charsRead < 0){
 						fprintf(stderr, "Sending verification request failed\n");
 						fflush(stderr);
@@ -154,7 +154,7 @@ int main (int argc, char *argv[])
 						exit(EXIT_FAILURE);
 					}
 
-					if(strcmp(buffer, CLIENTVERICODE) != 0){
+					if(strcmp(buffer, CLIENTENCVERICODE) != 0){
           					fprintf(stderr, "Verification failed\n");
 						fflush(stderr);
 						close(connectionSocket);
@@ -188,6 +188,7 @@ int main (int argc, char *argv[])
 							
 					char encrypted[strlen(plaintext) + 1];
 					encrypted[strlen(plaintext)] = '\0';
+					memset(encrypted, '\0', strlen(plaintext));
 					char temp_plaintext[MAX_MSG_LEN + 1];
 			
 					temp_plaintext[MAX_MSG_LEN] = '\0';
@@ -199,8 +200,9 @@ int main (int argc, char *argv[])
 					result[MAX_MSG_LEN] = '\0';
 					char* reset_key = key;
 					char* reset_plaint = plaintext;
+					size_t plain_len = strlen(plaintext);
 					// Perform encryption in 1024 bit chunks
-					for(size_t advance = 0; advance < strlen(plaintext); advance += MAX_MSG_LEN){
+					for(size_t advance = 0; advance <= plain_len; advance += MAX_MSG_LEN){
 						if(encrypt_one_time_pad(temp_plaintext, temp_key, result) == EXIT_FAILURE){
 							fprintf(stderr,"Could not encrypt");
 
@@ -210,28 +212,33 @@ int main (int argc, char *argv[])
 							close(connectionSocket);
 							exit(EXIT_FAILURE);
 						};
-
+						fprintf(stderr, "Result 1: %s. Strlen result: %lu\n", result, strlen(result));
+						fflush(stderr);
 						// Add the result to the encrypted string
 						strncat(encrypted, result, strlen(result));
-
+						fprintf(stderr, "Encrypted 1: %s\n", encrypted);
+						fflush(stderr);
 						// Advance the key and plaintext pointers to continue the cycle
 						key += MAX_MSG_LEN;
 						plaintext += MAX_MSG_LEN;
 						memset(result, '\0', MAX_MSG_LEN);
 
-						// Put the next MAX_MSG_LEN chunck into the temp variables.
+						// Put the next MAX_MSG_LEN chunk into the temp variables.
 						strncpy(temp_plaintext, plaintext, MAX_MSG_LEN);
 						strncpy(temp_key, key, MAX_MSG_LEN);
+						fprintf(stderr, "Result: %s\n", result);
+						fflush(stderr);
 					}
+					fprintf(stderr, "Encrypted: %s\n", encrypted);
+					fflush(stderr);
 					key = reset_key;
 					plaintext = reset_plaint;
-
-
 					// Return encrypted plaintext to client
 					snprintf(buffer, sizeof buffer, "%zu", strlen(encrypted));
 					while(strcmp(send_key(encrypted, connectionSocket, strlen(encrypted)), RESTART) == 0){
 						fprintf(stderr, "Restarting plaintext\n");
 						fflush(stderr);
+
 					}
 					close(connectionSocket);
 					exit(EXIT_SUCCESS);

@@ -193,7 +193,7 @@ int main(int argc, char *argv[]){
 		close(connectionSocket);
     		error("Could not receive verification from server");
   	}
-	if(strcmp(buffer, SERVERVERICODE) != 0){
+	if(strcmp(buffer, SERVERENCVERICODE) != 0){
 		free(key);
 		free(plaintext);
 		close(connectionSocket);
@@ -201,7 +201,7 @@ int main(int argc, char *argv[]){
   	};
 	
 	// We've received the SERVERICODE, send CLIENTVERICODE
-	charsWritten = send(connectionSocket, CLIENTVERICODE, MAX_MSG_LEN, 0);
+	charsWritten = send(connectionSocket, CLIENTENCVERICODE, MAX_MSG_LEN, 0);
   	if(charsWritten < 0){
 		free(key);
 		free(plaintext);

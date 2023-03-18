@@ -48,8 +48,7 @@ char* send_key(char* key, int connectionSocket, size_t send_size){
 		
 		charsWritten = send(connectionSocket, key, MAX_MSG_LEN, 0);
 		if((int)strlen(key) < MAX_MSG_LEN ){
-
-			return "SUCCESS";
+			return SUCCESS;
 		}
 		if(charsWritten < MAX_MSG_LEN && (int)strlen(key) > MAX_MSG_LEN){
 			send(connectionSocket, RESTART, MAX_MSG_LEN, 0);
