@@ -128,9 +128,6 @@ int main (int argc, char *argv[])
   
       				else if(pid == 0){
 					num_threads++;
-        				printf("SERVER: Connected to client running at host %d port %d\n", ntohs (clientAddress.sin_addr.s_addr),
-					ntohs (clientAddress.sin_port));
-
 	      				// Get the message from the client and display it
 	      				memset (buffer, '\0', MAX_MSG_LEN);
 	      
@@ -201,8 +198,7 @@ int main (int argc, char *argv[])
 					char* reset_key = key;
 					char* reset_plaint = plaintext;
 					size_t plain_len = strlen(plaintext);
-					fprintf(stderr, "Length before encryption: %lu\n", strlen(encrypted));
-					fflush(stderr);
+					
 					// Perform encryption in 1024 bit chunks
 					for(size_t advance = 0; advance <= plain_len; advance += MAX_MSG_LEN){
 						if(decrypt_one_time_pad(temp_plaintext, temp_key, result) == EXIT_FAILURE){
@@ -214,28 +210,19 @@ int main (int argc, char *argv[])
 							close(connectionSocket);
 							exit(EXIT_FAILURE);
 						};
-						fprintf(stderr, "Length in dec server 1: %lu\n", strlen(result));
-						fflush(stderr);
 						// Add the result to the encrypted string
 						strncat(encrypted, result, strlen(result));
-						fprintf(stderr, "Length in dec server 2: %lu\n", strlen(encrypted));
-						fflush(stderr);
 						// Advance the key and plaintext pointers to continue the cycle
 						key += MAX_MSG_LEN;
 						plaintext += MAX_MSG_LEN;
 						memset(result, '\0', MAX_MSG_LEN);
-						fprintf(stderr, "Length in dec server 3: %lu\n", strlen(encrypted));
-						fflush(stderr);
 						// Put the next MAX_MSG_LEN chunk into the temp variables.
 						strncpy(temp_plaintext, plaintext, MAX_MSG_LEN);
 						strncpy(temp_key, key, MAX_MSG_LEN);
 					}
-					fprintf(stderr, "Length outside of loop: %lu", strlen(encrypted));
 					key = reset_key;
 					plaintext = reset_plaint;
 
-					fprintf(stderr, "Length of encrypted: %lu", strlen(encrypted));
-					fflush(stderr);
 					// Return encrypted plaintext to client
 					snprintf(buffer, sizeof buffer, "%zu", strlen(encrypted));
 					while(strcmp(send_key(encrypted, connectionSocket, strlen(encrypted)), RESTART) == 0){

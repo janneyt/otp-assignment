@@ -156,7 +156,9 @@ char* read_key(char* key, int connectionSocket){
 
 	// Test to make sure we've actually grabbed a number/integer
 	if((send_size = atoi(buffer)) == 0){
-		
+		if(strcmp(buffer, KILL) == 0){
+			return KILL;
+		}
 		fprintf(stderr, "I received something that isn't an integer, the network is not synchronized. Buffer: %s\n", buffer);
 		fflush(stderr);
 		send(connectionSocket, RESTART, MAX_MSG_LEN, 0);

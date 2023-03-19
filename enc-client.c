@@ -57,10 +57,10 @@ int main(int argc, char *argv[]){
 	FILE* plaintext_file = stdin;
 	size_t plaintext_size = MAX_MSG_LEN * 2;
 	char* key = malloc( key_size + 1);
-	memset(key, '\0', key_size + 1);
+	memset(key, '\0', key_size);
 	char keyname[MAX_MSG_LEN] = {0};
 	char* plaintext = malloc(plaintext_size + 1);
-	memset(key, '\0', plaintext_size + 1);
+	memset(key, '\0', plaintext_size);
 	char plaintext_name[MAX_MSG_LEN] = {0};
 	*plaintext = '\0';
 	*key = '\0';
@@ -197,7 +197,9 @@ int main(int argc, char *argv[]){
 		free(key);
 		free(plaintext);
 		close(connectionSocket);
-    		error("Wrong server.");
+    		fprintf(stderr,"Enc client attempted to connect to a server that was not enc server\n");
+		fflush(stderr);
+		exit(EXIT_FAILURE);
   	};
 	
 	// We've received the SERVERICODE, send CLIENTVERICODE
@@ -235,12 +237,22 @@ int main(int argc, char *argv[]){
 			free(key);
 			free(plaintext);
 			free(old_key);
+			close(connectionSocket);
 			error("Key has been irrevocably corrupted. Exiting and try again.");
 		}
 
 		// Since we want an endless loop until RESTART is *not* returned, just continue
 		continue;	
 		
+	}
+	if(strcmp(result, KILL) == 0){
+		fprintf(stderr, "Server error: %s cannot be encrypted\n", plaintext_name);
+		fflush(stderr);
+		free(key);
+		free(old_key);
+		free(plaintext);
+		close(connectionSocket);
+		exit(EXIT_FAILURE);
 	}
 	key = reset_key;
 	free(old_key);
@@ -255,7 +267,7 @@ int main(int argc, char *argv[]){
 	snprintf(buffer, sizeof buffer, "%zu", strlen(plaintext));
 	char* old_plaint = strndup(plaintext, strlen(plaintext));
 	char* reset_plaint = plaintext;
-	while(strcmp(send_key(plaintext, connectionSocket, strlen(plaintext)), RESTART) == 0){
+	while(strcmp((result = send_key(plaintext, connectionSocket, strlen(plaintext))), RESTART) == 0){
 		if(strcmp(plaintext, old_plaint) != 0){
 			free(key);
 			free(plaintext);
@@ -263,6 +275,16 @@ int main(int argc, char *argv[]){
 			error("Plaintext has been irrevocably corrupted. Exiting and try again.");
 		}
 		continue;
+	}
+	if(strcmp(result, KILL) == 0){
+
+		fprintf(stderr, "Server error: %s cannot be encrypted\n", plaintext_name);
+		fflush(stderr);
+		free(key);
+		free(old_plaint);
+		free(plaintext);
+		close(connectionSocket);
+		exit(EXIT_FAILURE);
 	}
 	free(old_plaint);
 	plaintext = reset_plaint;
@@ -272,7 +294,7 @@ int main(int argc, char *argv[]){
 	}
 
 	char* encrypted = malloc(MAX_MSG_LEN + 1);
-	memset(encrypted, '\0', MAX_MSG_LEN + 1);
+	memset(encrypted, '\0', MAX_MSG_LEN);
 	while(strcmp((encrypted = read_key(encrypted, connectionSocket)), RESTART) == 0){
 		
 		// Unlike the earlier plaintext/key functions, we don't have to store a value to send, we're receiving a value.
@@ -280,12 +302,22 @@ int main(int argc, char *argv[]){
 		encrypted = calloc(MAX_MSG_LEN + 1, sizeof(char));
 		encrypted[MAX_MSG_LEN] = '\0';
 	}
+	if(strcmp(encrypted, KILL) == 0){
 
-	// Ironically, this is the line we're graded on. The newline at the end is for text file generation.
-	fprintf(stdout, "%s\n", encrypted);
-	fflush(stdout);
+		fprintf(stderr, "Server error: %s cannot be encrypted\n", plaintext_name);
+		fflush(stderr);
+		close(connectionSocket);
+		free(key);
+		free(plaintext);
+		exit(EXIT_FAILURE);
+	} else {
 
-  	// Close the socket
+		// Ironically, this is the line we're graded on. The newline at the end is for text file generation.
+		fprintf(stdout, "%s\n", encrypted);
+		fflush(stdout);
+	}
+  	
+	// Close the socket
   	close(connectionSocket);
  	free(key);
 	free(plaintext);

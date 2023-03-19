@@ -34,8 +34,6 @@ int encrypt_one_time_pad(char* message, char* key, char* result)
     for (size_t i = 0; i < mes_len; i++) {
 	if(message[i] > 122 || message[i] < 65 || ( message[i] > 90 && message[i] < 97)){
 		if(message[i] != 32){
-			fprintf(stdout, "enc_client error: input contains bad characters. %c.", message[i]);
-			fflush(stdout);
 			return EXIT_FAILURE;
 		}
 		cipher[i] = message[i];
@@ -44,7 +42,6 @@ int encrypt_one_time_pad(char* message, char* key, char* result)
     
 	}
     }
-    fprintf(stderr, "%s\n", cipher);
     /* Print the encrypted message to standard output */
     strcpy(result, cipher);
     return EXIT_SUCCESS;
@@ -72,7 +69,7 @@ int decrypt_one_time_pad(char message[MAX_MSG_LEN + 1], char key[MAX_MSG_LEN + 1
     }
 
     size_t mes_len = strlen(message);
-    fprintf(stderr, "mes_len: %lu", mes_len);
+    
     /* Encrypt the message using one-time pad */
     for (size_t i = 0; i < mes_len; i++) {
 	if(message[i] > 122 || message[i] < 65 || ( message[i] > 90 && message[i] < 97)){
@@ -90,14 +87,10 @@ int decrypt_one_time_pad(char message[MAX_MSG_LEN + 1], char key[MAX_MSG_LEN + 1
 		}
 		cipher[i] = cipher[i] % 26 + 'A';
 	}
-	fprintf(stderr, "cipher i in decrypt: %c\n", cipher[i]);
-	fflush(stderr);
     }
 
     /* Print the encrypted message to standard output */
     strcpy(result, cipher);
-    fprintf(stderr, "Length after strcpy: %lu", strlen(result));
-    fflush(stderr);
     return EXIT_SUCCESS;
 }
 

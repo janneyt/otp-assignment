@@ -197,7 +197,7 @@ int main(int argc, char *argv[]){
 		free(key);
 		free(plaintext);
 		close(connectionSocket);
-    		error("Wrong server.");
+    		exit(EXIT_FAILURE);
   	};
 	
 	// We've received the SERVERICODE, send CLIENTVERICODE

@@ -128,9 +128,7 @@ int main (int argc, char *argv[])
   
       				else if(pid == 0){
 					num_threads++;
-        				printf("SERVER: Connected to client running at host %d port %d\n", ntohs (clientAddress.sin_addr.s_addr),
-					ntohs (clientAddress.sin_port));
-
+        			
 	      				// Get the message from the client and display it
 	      				memset (buffer, '\0', MAX_MSG_LEN);
 	      
@@ -155,10 +153,16 @@ int main (int argc, char *argv[])
 					}
 
 					if(strcmp(buffer, CLIENTENCVERICODE) != 0){
-          					fprintf(stderr, "Verification failed\n");
+						if(strcmp(buffer, CLIENTDECVERICODE) == 0){
+							fprintf(stderr, "Verification failed because dec client cannot connect to enc server");
+							fflush(stderr);
+							close(connectionSocket);
+							exit(EXIT_FAILURE);
+						}
+          					fprintf(stderr, "Dec client cannot connect to enc server\n");
 						fflush(stderr);
 						close(connectionSocket);
-						error("Could not trust client");
+						exit(EXIT_FAILURE);
         				}
 
         				charsRead = send(connectionSocket, VERIFICATION_RECEIVED, 39, 0);
@@ -204,20 +208,14 @@ int main (int argc, char *argv[])
 					// Perform encryption in 1024 bit chunks
 					for(size_t advance = 0; advance <= plain_len; advance += MAX_MSG_LEN){
 						if(encrypt_one_time_pad(temp_plaintext, temp_key, result) == EXIT_FAILURE){
-							fprintf(stderr,"Could not encrypt");
-
-							fflush(stderr);
+							send(connectionSocket, KILL, 100, 0);
 							free(plaintext);
 							free(key);
-							close(connectionSocket);
+							//close(connectionSocket);
 							exit(EXIT_FAILURE);
 						};
-						fprintf(stderr, "Result 1: %s. Strlen result: %lu\n", result, strlen(result));
-						fflush(stderr);
 						// Add the result to the encrypted string
 						strncat(encrypted, result, strlen(result));
-						fprintf(stderr, "Encrypted 1: %s\n", encrypted);
-						fflush(stderr);
 						// Advance the key and plaintext pointers to continue the cycle
 						key += MAX_MSG_LEN;
 						plaintext += MAX_MSG_LEN;
@@ -226,11 +224,7 @@ int main (int argc, char *argv[])
 						// Put the next MAX_MSG_LEN chunk into the temp variables.
 						strncpy(temp_plaintext, plaintext, MAX_MSG_LEN);
 						strncpy(temp_key, key, MAX_MSG_LEN);
-						fprintf(stderr, "Result: %s\n", result);
-						fflush(stderr);
 					}
-					fprintf(stderr, "Encrypted: %s\n", encrypted);
-					fflush(stderr);
 					key = reset_key;
 					plaintext = reset_plaint;
 					// Return encrypted plaintext to client

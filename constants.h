@@ -13,4 +13,6 @@
 # define CLIENTDECVERICODE	"I am the dec client"
 # define SUCCESS		"SUCCESS"
 # define NOKEY			"No key"
+# define KILL			"Kill"
+
 extern size_t key_size;
